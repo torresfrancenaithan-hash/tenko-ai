@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tenko.ai</title>
+  <style>
+    * { box-sizing: border-box; font-family: sans-serif; }
+    body { margin: 0; background: #121212; color: #fff; display: flex; flex-direction: column; height: 100vh; }
+    header { background: #1f242d; padding: 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #30363d; }
+    header h1 { font-size: 17px; margin: 0; color: #58a6ff; letter-spacing: 0.5px; }
+    .btn-small { background: #238636; border: none; color: white; padding: 7px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+    .btn-sec { background: #30363d; }
+    .btn-danger { background: #da3633; margin-left: 6px; }
+    #setupModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 50; padding: 20px; align-items: center; justify-content: center; }
+    .modal-box { background: #161b22; padding: 20px; border-radius: 12px; width: 100%; max-width: 350px; border: 1px solid #30363d; }
+    .modal-box input { width: 100%; padding: 10px; margin: 8px 0 14px; border-radius: 6px; border: 1px solid #30363d; background: #0d1117; color: white; }
+    #chatBox { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .msg { max-width: 82%; padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.45; word-wrap: break-word; white-space: pre-wrap; }
+    .user { background: #1f6feb; align-self: flex-end; border-bottom-right-radius: 2px; }
+    .bot { background: #21262d; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #30363d; }
+    .tag { font-size: 10px; color: #8b949e; display: block; margin-bottom: 4px; font-weight: bold; }
+    .msg img { width: 100%; border-radius: 8px; display: block; }
+    .loader-wrap { display: flex; align-items: center; gap: 10px; padding: 4px 2px; }
+    .dots { display: flex; gap: 4px; }
+    .dots span { width: 7px; height: 7px; background: #58a6ff; border-radius: 50%; animation: bounce 1.2s infinite ease-in-out; }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+    .pct-text { font-size: 13px; font-weight: bold; color: #58a6ff; min-width: 38px; }
+    @keyframes bounce { 0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+    .input-area { display: flex; gap: 8px; padding: 10px; background: #1f242d; border-top: 1px solid #30363d; }
+    .input-area input { flex: 1; padding: 12px; border-radius: 20px; border: 1px solid #30363d; background: #0d1117; color: white; outline: none; }
+    .input-area button { background: #1f6feb; border: none; color: white; padding: 0 18px; border-radius: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div id="setupModal">
+    <div class="modal-box">
+      <h3 style="margin-top:0;">[Security] Tenko.ai Setup</h3>
+      <label style="font-size:12px;">OpenRouter API Key:</label>
+      <input type="password" id="apiKeyInput" placeholder="sk-or-v1-...">
+      <button class="btn-small" id="saveBtn">Save Key</button>
+      <button class="btn-small btn-sec" id="closeBtn">Close</button>
+      <button class="btn-small btn-danger" id="wipeBtn">Wipe Data</button>
+      <p style="font-size:11px; color:#8b949e; margin-top:12px;">
+        Learned Memories: <span id="memCount">0</span> responses saved
+      </p>
+    </div>
+  </div>
+  <header>
+    <h1>Tenko.ai</h1>
+    <button class="btn-small btn-sec" id="setupBtn">Setup</button>
+  </header>
+  <div id="chatBox">
+    <div class="msg bot"><span class="tag">[Secured System Ready]</span>Hello! I am Tenko.ai. Ask me anything in any language, paste a suspicious link to scan for scams, or type <b>/imagine [description]</b> to generate an image.</div>
+  </div>
+  <div class="input-area">
+    <input type="text" id="userInput" placeholder="Ask Tenko.ai or /imagine...">
+    <button id="sendBtn">Send</button>
+  </div>
+  <script>
+    function getStore(k, f) { try { return localStorage.getItem(k) || f; } catch(e) { return f; } }
+    function setStore(k, v) { try { localStorage.setItem(k, v); } catch(e) {} }
+    function encodeKey(s) { try { return btoa(s.split('').reverse().join('')); } catch(e) { return s; } }
+    function decodeKey(s) { try { return atob(s).split('').reverse().join(''); } catch(e) { return s; } }
+
+    let aiMemory = {};
+    try { aiMemory = JSON.parse(getStore('tenkoMem_gh', '{}')); } catch(e) {}
+    let apiKey = decodeKey(getStore('tenkoKey_gh', ''));
+
+    document.getElementById('setupBtn').onclick = function() {
+      document.getElementById('apiKeyInput').value = apiKey;
+      document.getElementById('memCount').textContent = Object.keys(aiMemory).length;
+      document.getElementById('setupModal').style.display = 'flex';
+    };
+
+    document.getElementById('closeBtn').onclick = function() {
+      document.getElementById('setupModal').style.display = 'none';
+    };
+
+    document.getElementById('saveBtn').onclick = function() {
+      const k = document.getElementById('apiKeyInput').value.trim();
+      if (k) {
+        apiKey = k;
+        setStore('tenkoKey_gh', encodeKey(apiKey));
+        alert('API Key encrypted and saved!');
+      }
+      document.getElementById('setupModal').style.display = 'none';
+    };
+
+    document.getElementById('wipeBtn').onclick = function() {
+      if (confirm('Erase API Key and all learned memories?')) {
+        aiMemory = {};
+        apiKey = '';
+        try { localStorage.clear(); } catch(e) {}
+        alert('All local data wiped.');
+        document.getElementById('setupModal').style.display = 'none';
+      }
+    };
+
+    function addMessage(text, sender, tag, isHtml) {
+      const box = document.getElementById('chatBox');
+      const div = document.createElement('div');
+      div.className = 'msg ' + sender;
+      if (tag) {
+        const span = document.createElement('span');
+        span.className = 'tag';
+        span.textContent = tag;
+        div.appendChild(span);
+      }
+      if (isHtml) {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = text;
+        div.appendChild(wrap);
+      } else {
+        div.appendChild(document.createTextNode(text));
+      }
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+      return div;
+    }
+
+    function generateImageWithProgress(prompt) {
+      const box = document.getElementById('chatBox');
+      const bubble = document.createElement('div');
+      bubble.className = 'msg bot';
+      bubble.innerHTML = '<div class="loader-wrap"><div class="dots"><span></span><span></span><span></span></div><span class="pct-text">0%</span></div>';
+      box.appendChild(bubble);
+      box.scrollTop = box.scrollHeight;
+
+      const pctSpan = bubble.querySelector('.pct-text');
+      let percent = 0;
+      let ready = false;
+      const seed = Math.floor(Math.random() * 999999);
+      const url = 'https://picsum.photos' + encodeURIComponent(prompt + seed) + '/512/512';
+      
+      const finalImg = document.createElement('img');
+      finalImg.style.display = 'none';
+      finalImg.src = url;
+      bubble.appendChild(finalImg);
+
+      finalImg.onload = function() { ready = true; };
+      finalImg.onerror = function() {
+        clearInterval(t);
+        bubble.innerHTML = '<span class="tag">[Error]</span>Image service unavailable.';
+      };
+
+      const t = setInterval(function() {
+        if (!ready && percent < 95) {
+          percent = Math.min(95, percent + 10);
+          pctSpan.textContent = percent + '%';
+        } else if (ready && percent < 100) {
+          percent = Math.min(100, percent + 15);
+          pctSpan.textContent = percent + '%';
+        }
+        if (percent === 100 && ready) {
+          clearInterval(t);
+          const wrap = bubble.querySelector('.loader-wrap');
+          if (wrap) wrap.remove();
+          finalImg.style.display = 'block';
+          box.scrollTop = box.scrollHeight;
+        }
+      }, 200);
+    }
+
+    async function sendMessage() {
+      const inp = document.getElementById('userInput');
+      const raw = inp.value.trim();
+      if (!raw) return;
+
+      addMessage(raw, 'user', '', false);
+      inp.value = '';
+      const key = raw.toLowerCase();
+
+      if (key.startsWith('/imagine ')) {
+        const prompt = raw.substring(9).trim();
+        if (prompt) generateImageWithProgress(prompt);
+        return;
+      }
+
+      if (aiMemory[key]) {
+        addMessage(aiMemory[key], 'bot', '[Tenko Memory - Offline Ready]', false);
+        return;
+      }
+
+      if (!apiKey) {
+        addMessage('API Key is missing. Tap Setup at the top right and paste your sk-or-v1-... key.', 'bot', '[Setup Required]', false);
+        return;
+      }
+
+      const load = addMessage('<div class="loader-wrap"><div class="dots"><span></span><span></span><span></span></div></div>', 'bot', '', true);
+
+      try {
+        const rule = 'You are Tenko.ai, a helpful multilingual personal AI assistant with cybersecurity awareness. Automatically detect the exact language used by the user (English, Tagalog, Taglish, Japanese, Korean, Spanish, etc.) and answer naturally in that exact same language. If the user pastes a link or suspicious text, warn them clearly if it looks like a scam.';
+        const res = await fetch('https://openrouter.ai', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey,
+            'HTTP-Referer': window.location.href,
+            'X-Title': 'Tenko.ai'
+          },
+          body: JSON.stringify({
+            model: 'openrouter/free',
+            messages: [
+              { role: 'system', content: rule },
+              { role: 'user', content: raw }
+            ]
+          })
+        });
+
+        const data = await res.json();
